@@ -1,9 +1,14 @@
 from machine import Pin, I2C, PWM
 import utime
 import time
+import dht
 
 # from pico_i2c_lcd import I2cLcd  # use your working driver
 from i2c_lcd import I2cLcd
+
+# --- DHT22 setup (GP2) ---
+### DHT22 ADDED ###
+dht_sensor = dht.DHT22(Pin(2))
 
 # Define notes (Hz)
 NOTES = {
@@ -18,7 +23,7 @@ NOTES = {
 }
 
 LOUD_BEEP = False
-SERVO_ENABLED = True
+SERVO_ENABLED = False
 
 # Play melody on passive buzzer
 def play_melody(pin_number, melody, duration=0.3, octave_shift=0):
@@ -179,15 +184,22 @@ while True:
     time_str = "{:02}:{:02}:{:02}".format(hour, minute, int(second))
     lcd.putstr("Clock " + time_str)
 
-    # --- SCROLLING MESSAGE BOTTOM LINE ---
-    if utime.time() - last_motion_display > motion_message_timeout:
+    # --- DHT22 reading instead of scrolling ---
+    ### DHT22 ADDED ###
+    try:
+        dht_sensor.measure()
+        temp = dht_sensor.temperature()
+        hum = dht_sensor.humidity()
+        lcd.move_to(0, 1)  # second line
+        line = "T:{:.1f}C H:{:.1f}%".format(temp, hum)
+        lcd.putstr(line)  # pad to 16 chars
+    except:
         lcd.move_to(0, 1)
-        lcd.putstr(scroll_buffer[scroll_index:scroll_index+16])
-        scroll_index = (scroll_index + 1) % (len(scroll_buffer) - 15)
+        lcd.putstr("Sensor Error   ")
 
     # --- Tick time ---
-    utime.sleep(scroll_delay)
-    second += scroll_delay
+    utime.sleep(2)   # update sensor every 2 sec
+    second += 2
     if second >= 60:
         second = 0
         minute += 1
@@ -196,3 +208,21 @@ while True:
         hour += 1
     if hour >= 24:
         hour = 0
+
+    # # --- SCROLLING MESSAGE BOTTOM LINE ---
+    # if utime.time() - last_motion_display > motion_message_timeout:
+    #     lcd.move_to(0, 1)
+    #     lcd.putstr(scroll_buffer[scroll_index:scroll_index+16])
+    #     scroll_index = (scroll_index + 1) % (len(scroll_buffer) - 15)
+
+    # # --- Tick time ---
+    # utime.sleep(scroll_delay)
+    # second += scroll_delay
+    # if second >= 60:
+    #     second = 0
+    #     minute += 1
+    # if minute >= 60:
+    #     minute = 0
+    #     hour += 1
+    # if hour >= 24:
+    #     hour = 0
