@@ -7,7 +7,6 @@ import dht
 from i2c_lcd import I2cLcd
 
 # --- DHT22 setup (GP2) ---
-### DHT22 ADDED ###
 dht_sensor = dht.DHT22(Pin(2))
 
 # Define notes (Hz)
@@ -23,7 +22,9 @@ NOTES = {
 }
 
 LOUD_BEEP = False
+QUIET_BEEP = True
 SERVO_ENABLED = False
+MELODY_ENABLED = False
 
 # Play melody on passive buzzer
 def play_melody(pin_number, melody, duration=0.3, octave_shift=0):
@@ -43,14 +44,9 @@ def play_melody(pin_number, melody, duration=0.3, octave_shift=0):
 # Example melody
 melody = ["C4", "E4", "G4", "C5"]
 
-# Play normally
-play_melody(16, melody, duration=0.1, octave_shift=0)
-
-# Play 1 octave up
-play_melody(16, melody, duration=0.1, octave_shift=1)
-
-# Play 1 octave down
-play_melody(16, melody, duration=0.1, octave_shift=-1)
+if MELODY_ENABLED:
+    for octave in [0, 1, -1]:
+        play_melody(16, melody, duration=0.1, octave_shift=octave)
 
 
 # --- LCD Setup ---
@@ -143,12 +139,20 @@ if SERVO_ENABLED:
 while True:
     current_time = utime.time()
 
+    # --- Update backlight based on idle time ---
+    update_backlight()
+
+    # --- CLOCK TOP LINE ---
+    lcd.move_to(0, 0)   # ensure cursor at start of line
+    time_str = "{:02}:{:02}:{:02}".format(hour, minute, int(second))
+    lcd.putstr("Clock:" + time_str)
+
     # --- PIR MOTION CHECK ---
     if pir.value() == 1:
         last_motion_time = current_time
         lcd.backlight_on()  # bright when motion
-        lcd.move_to(0, 1)
-        lcd.putstr("Motion detected!  ")  # overwrite scroll line
+        #lcd.move_to(0, 1)
+        #lcd.putstr("Motion detected!  ")  # overwrite scroll line
         last_motion_display = utime.time()
 
         if SERVO_ENABLED:
@@ -158,34 +162,22 @@ while True:
         if LOUD_BEEP:
             play_passive(880*3, 0.1)  # short tone
             beep_active(0.1)
-        else:
+        elif QUIET_BEEP:
             for d in [0.1, 0.1, 0.2]:
                 play_passive(880*3, d)
-        utime.sleep(0.5)  # wait a little so it doesn’t repeat too fast    
+            utime.sleep(0.5)  # wait a little so it doesn’t repeat too fast    
 
-        # Play normally
-        play_melody(16, melody, duration=0.1, octave_shift=0)
-        # Play 1 octave up
-        play_melody(16, melody, duration=0.1, octave_shift=1)
-        # Play 1 octave down
-        play_melody(16, melody, duration=0.1, octave_shift=-1)
-        utime.sleep(0.5)  # wait a little so it doesn’t repeat too fast
+        if MELODY_ENABLED:
+            for octave in [0, 1, -1]:
+                play_melody(16, melody, duration=0.1, octave_shift=octave)
+            utime.sleep(0.5)  # wait a little so it doesn’t repeat too fast
 
         if SERVO_ENABLED:
             pos = move_servo_smooth(pos, 0, step=1, delay=0.01)
             utime.sleep(0.5)
 
 
-    # --- Update backlight based on idle time ---
-    update_backlight()
-
-    # --- CLOCK TOP LINE ---
-    lcd.move_to(0, 0)   # ensure cursor at start of line
-    time_str = "{:02}:{:02}:{:02}".format(hour, minute, int(second))
-    lcd.putstr("Clock " + time_str)
-
     # --- DHT22 reading instead of scrolling ---
-    ### DHT22 ADDED ###
     try:
         dht_sensor.measure()
         temp = dht_sensor.temperature()
@@ -226,3 +218,5 @@ while True:
     #     hour += 1
     # if hour >= 24:
     #     hour = 0
+
+# TODO: Add configurable timer (from 1min to 60 min) instead of clock
